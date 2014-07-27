@@ -13,16 +13,22 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.net.Uri;
+import android.support.v4.view.GestureDetectorCompat;
+import android.support.v4.view.MotionEventCompat;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-public class TagCloudView extends RelativeLayout {
+public class TagCloudView extends RelativeLayout implements
+        GestureDetector.OnGestureListener {
     RelativeLayout navigation_bar;
     TextView mTextView1;
 
+    //private GestureDetectorCompat mDetector;
+    private GestureDetector mDetector;
 
     public TagCloudView(Context mContext, int width, int height, List<Tag> tagList) {
         this(mContext, width, height, tagList, 6, 34, 1); //default for min/max text size
@@ -109,7 +115,13 @@ public class TagCloudView extends RelativeLayout {
             i++;
         }
 
+        this.setDescendantFocusability(FOCUS_BEFORE_DESCENDANTS);
 
+        // Instantiate the gesture detector with the
+        // application context and an implementation of
+        // GestureDetector.OnGestureListener
+        //mDetector = new GestureDetectorCompat(getContext(), this);
+        mDetector = new GestureDetector(getContext(),this);
     }
 
     @Override
@@ -234,57 +246,45 @@ public class TagCloudView extends RelativeLayout {
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent e) {
-        float x = e.getX();
-        float y = e.getY();
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
 
-        switch (e.getAction() & MotionEvent.ACTION_MASK) {
+        /*
+         * This method JUST determines whether we want to intercept the motion.
+         * If we return true, onTouchEvent will be called and we do the actual
+         * scrolling there.
+         */
 
-            case MotionEvent.ACTION_DOWN:
-                x0 = x;
-                y0 = y;
-                return true;
 
-            case MotionEvent.ACTION_MOVE:
-                //rotate elements depending on how far the selection point is from center of cloud
-                float dx = x - centerX;
-                float dy = y - centerY;
-                // float dx = x - x0;
-                // float dy = y - y0;
-                mAngleX = (dy / radius) * tspeed * TOUCH_SCALE_FACTOR;
-                mAngleY = (-dx / radius) * tspeed * TOUCH_SCALE_FACTOR;
-                Log.d("TagCloudView", "onTouchEvent mAngleX:"+mAngleX+" mAngleY:"+mAngleY);
+        final int action = MotionEventCompat.getActionMasked(ev);
 
-                mTagCloud.setAngleX(mAngleX);
-                mTagCloud.setAngleY(mAngleY);
-                mTagCloud.update();
-
-                Iterator it = mTagCloud.iterator();
-                Tag tempTag;
-                while (it.hasNext()) {
-                    tempTag = (Tag) it.next();
-                    mParams.get(tempTag.getParamNo()).setMargins(
-                            (int) (centerX - shiftLeft + tempTag.getLoc2DX()),
-                            (int) (centerY + tempTag.getLoc2DY()),
-                            0,
-                            0);
-                    mTextView.get(tempTag.getParamNo()).setTextSize((int) (tempTag.getTextSize() * tempTag.getScale()));
-                    int mergedColor = Color.argb((int) (tempTag.getAlpha() * 255),
-                            (int) (tempTag.getColorR() * 255),
-                            (int) (tempTag.getColorG() * 255),
-                            (int) (tempTag.getColorB() * 255));
-                    mTextView.get(tempTag.getParamNo()).setTextColor(mergedColor);
-                    mTextView.get(tempTag.getParamNo()).bringToFront();
-                }
-
-                return true;
-        /*case MotionEvent.ACTION_UP:  //now it is clicked!!!!
-			dx = x - centerX;
-			dy = y - centerY;
-			break;*/
+        // Always handle the case of the touch gesture being complete.
+        if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) {
+            // Release the scroll.
+            //mIsScrolling = false;
+            return false; // Do not intercept touch event, let the child handle it
         }
 
+        switch (action) {
+            case MotionEvent.ACTION_MOVE: {
+                //if (mIsScrolling) {
+                    // We're currently scrolling, so yes, intercept the
+                    // touch event!
+                    return true;
+                //}
+
+            }
+
+        }
+
+        // In general, we don't want to intercept touch events. They should be
+        // handled by the child view.
         return false;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+
+        return mDetector.onTouchEvent(event);
     }
 
 
@@ -352,4 +352,66 @@ public class TagCloudView extends RelativeLayout {
     private List<TextView> mTextView;
     private List<RelativeLayout.LayoutParams> mParams;
     private int shiftLeft;
+
+    @Override
+    public boolean onDown(MotionEvent motionEvent) {
+        return true;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent motionEvent) {
+
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent motionEvent) {
+        return false;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX,
+                            float distanceY) {
+        //rotate elements depending on how far the selection point is from center of cloud
+//        float dx = x - centerX;
+//        float dy = y - centerY;
+        // float dx = x - x0;
+        // float dy = y - y0;
+        mAngleX = (distanceY / radius) * tspeed * TOUCH_SCALE_FACTOR;
+        mAngleY = (-distanceX / radius) * tspeed * TOUCH_SCALE_FACTOR;
+        Log.d("TagCloudView", "onScroll mAngleX:"+mAngleX+" mAngleY:"+mAngleY);
+
+        mTagCloud.setAngleX(mAngleX);
+        mTagCloud.setAngleY(mAngleY);
+        mTagCloud.update();
+
+        Iterator it = mTagCloud.iterator();
+        Tag tempTag;
+        while (it.hasNext()) {
+            tempTag = (Tag) it.next();
+            mParams.get(tempTag.getParamNo()).setMargins(
+                    (int) (centerX - shiftLeft + tempTag.getLoc2DX()),
+                    (int) (centerY + tempTag.getLoc2DY()),
+                    0,
+                    0);
+            mTextView.get(tempTag.getParamNo()).setTextSize((int) (tempTag.getTextSize() * tempTag.getScale()));
+            int mergedColor = Color.argb((int) (tempTag.getAlpha() * 255),
+                    (int) (tempTag.getColorR() * 255),
+                    (int) (tempTag.getColorG() * 255),
+                    (int) (tempTag.getColorB() * 255));
+            mTextView.get(tempTag.getParamNo()).setTextColor(mergedColor);
+            mTextView.get(tempTag.getParamNo()).bringToFront();
+        }
+        return true;
+    }
+
+    @Override
+    public void onLongPress(MotionEvent motionEvent) {
+
+    }
+
+    @Override
+    public boolean onFling(MotionEvent event1, MotionEvent event2,
+                           float velocityX, float velocityY) {
+        return false;
+    }
 }

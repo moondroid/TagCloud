@@ -45,7 +45,7 @@ public class MainActivity extends ActionBarActivity {
         List<Tag> myTagList= createTags();
 
         //Step3: create our TagCloudview and set it as the content of our MainActivity
-        mTagCloudView = new TagCloudView(this, width, height, myTagList, 6, 34, 5 ); //passing current context
+        mTagCloudView = new TagCloudView(this, width, height, myTagList, 6, 34, 10 ); //passing current context
         setContentView(mTagCloudView);
         mTagCloudView.requestFocus();
         mTagCloudView.setFocusableInTouchMode(true);
